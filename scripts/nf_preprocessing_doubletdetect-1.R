@@ -81,7 +81,7 @@ for (sample in sample_list){
   print(sample)
   if (INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0) {
     seurat_obj <- readRDS(INPUT_SEURAT)
-    seurat_obj <- subset(seurat_obj, subset = nFeature_RNA > FILTER_CELLS_MIN & nFeature_RNA > FILTER_FEAT_MIN)
+    seurat_obj <- subset(seurat_obj, subset = nFeature_RNA > FILTER_FEAT_MIN)
   } else {
     filtered_files <- grep(sample, relevant_files_full, value = TRUE)
     print(filtered_files)

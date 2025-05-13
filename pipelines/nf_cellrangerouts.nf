@@ -1,5 +1,6 @@
 // Set script_dir to the current directory
-script_dir = "${workflow.projectDir}"
+project_dir = "${workflow.projectDir}"
+scripts_dir = "${project_dir}/scripts"
 
 params.cellrangermulti = 1 // 1 true or 0 false depending on your case
 params.cellrangeroutpath = '/path/to/cellrangerouts'
@@ -13,7 +14,7 @@ process copyOuts {
 
     script:
     """
-    python3 $script_dir/nf_cellrangerouts_copy.py \
+    python3 $scripts_dir/nf_cellrangerouts_copy.py \
         --datlabel '${datlabel}' \
         --cellrangermulti '${params.cellrangermulti}' \
         --cellrangeroutpath '${params.cellrangeroutpath}/${datlabel}'

@@ -52,7 +52,7 @@ if (SPECIES == "mouse") {
 
 if (INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0) {
   seurat_obj <- readRDS(INPUT_SEURAT)
-  seurat_obj <- subset(seurat_obj, subset = nFeature_RNA > FILTER_CELLS_MIN & nFeature_RNA > FILTER_FEAT_MIN)
+  seurat_obj <- subset(seurat_obj, subset = nFeature_RNA > FILTER_FEAT_MIN)
 } else {
   all_files_full <- list.files(INDIR, full.names = T)
   relevant_files_full <- grep("\\.(mtx|mtx.gz|tsv.gz|tsv)$", all_files_full, value = TRUE)

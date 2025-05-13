@@ -3,8 +3,7 @@ You will need to define clusterres in nextflow config prior to running this pipe
 This pipeline will help define cell-annotation based on your specified cluster res.
 */  
 project_dir = "${workflow.projectDir}"//'/Users/tlee/Documents/misc_maybeuseful/rpipeline_singlecell/nextflow'
-
-
+scripts_dir = "${project_dir}/scripts"
     
 // -- TODO these filenameing definitions probably can be elsewhere
 def norm_filtered_data
@@ -52,8 +51,8 @@ process clusterres_selection {
 
     script: // TODO still have dependency of filtered_data annotation and rscript (so need to set both if adjusting)
     """
-    conda run -n scseq Rscript $project_dir/nf_selectclusterres-4.R \
-        '${project_dir}' \
+    conda run -n scseq Rscript $scripts_dir/nf_selectclusterres-4.R \
+        '${scripts_dir}' \
         --datlabel '${params.datlabel}' \
         --infile '${clustered_data_path}' \
         --outfile '${clusterres_data}' \
@@ -80,8 +79,8 @@ process annotate_sctype {
 
     script:
     """
-    conda run -n scseq Rscript $project_dir/nf_annomarkerbased-5.R \
-        '${project_dir}' \
+    conda run -n scseq Rscript $scripts_dir/nf_annomarkerbased-5.R \
+        '${scripts_dir}' \
         --datlabel '${params.datlabel}' \
         --infile '${clusterres_data}' \
         --norm ${params.norm} \
@@ -108,9 +107,9 @@ process annotate_scanvi_celltypist {
 
     script:
     """
-    echo $project_dir
+    echo $scripts_dir
     echo $norm_filtered_data
-    conda run -n scseq python3 $project_dir/nf_cellannotation_scanvi_celltypist_refbased-6.py \
+    conda run -n scseq python3 $scripts_dir/nf_cellannotation_scanvi_celltypist_refbased-6.py \
         --datlabel '${params.datlabel}' \
         --infile '${annotate1}' \
         --outfile '${queryOutPath}' \
@@ -138,7 +137,7 @@ process plot_annotations {
     script:
     if (params.integrate == "NONE") {
         """
-        echo $project_dir
+        echo $scripts_dir
         PKL_FILE=""
         for file in \$(echo ${plot_input}); do
             if [[ \$file == *.pkl ]]; then
@@ -151,7 +150,7 @@ process plot_annotations {
             exit 1  # Exit with an error code to indicate failure
         else
             echo "Using .pkl file \$PKL_FILE from ${plot_input}"
-            conda run -n scseq python3 $project_dir/nf_plot_cellannotations_eda-7.py \
+            conda run -n scseq python3 $scripts_dir/nf_plot_cellannotations_eda-7.py \
                 --datlabel '${params.datlabel}' \
                 --infile "\$PKL_FILE" \
                 --sample_id '${params.sample_id}' \
@@ -165,7 +164,7 @@ process plot_annotations {
             if [[ \$file == *.h5ad ]]; then
                 INT_FILE=\$file
                 echo "Using .h5ad file \$INT_FILE from ${plot_input}"
-                conda run -n scseq python3 $project_dir/nf_plot_cellannotations_eda-7.py \
+                conda run -n scseq python3 $scripts_dir/nf_plot_cellannotations_eda-7.py \
                     --datlabel '${params.datlabel}' \
                     --infile "\$INT_FILE" \
                     --sample_id '${params.sample_id}' \

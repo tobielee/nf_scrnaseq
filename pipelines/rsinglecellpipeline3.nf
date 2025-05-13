@@ -3,6 +3,7 @@ You will need to define clusterres in nextflow config prior to running this pipe
 This pipeline will help define cell-annotation based on your specified cluster res.
 */  
 project_dir = "${workflow.projectDir}"
+scripts_dir = "${project_dir}/scripts"
 
 // -- TODO these filenameing definitions probably can be elsewhere
 def norm_filtered_data
@@ -65,7 +66,7 @@ process annotate_h5ad {
     script:
     """
     echo "Processing annotation file: ${anno_csv} with data file: ${anndata}"
-    conda run -n scseq python $project_dir/nf_annotate-8.py \
+    conda run -n scseq python $scripts_dir/nf_annotate-8.py \
         --annocsv '${anno_csv}' \
         --adatafile '${anndata}' \
         --annofield1 '${params.annofield1}' \
@@ -84,8 +85,8 @@ process backpropagate_annotations {
 
     script:
     """
-    conda run -n scseq Rscript $project_dir/nf_annotations_h5ad_to_rds-8.R \
-        '${project_dir}' \
+    conda run -n scseq Rscript $scripts_dir/nf_annotations_h5ad_to_rds-8.R \
+        '${scripts_dir}' \
         --seuratcountfile '${seuratAnno}' \
         --annfile '${anndataAnno}' \
         --integrate '${params.integrate}' \
@@ -113,7 +114,7 @@ process integrate_singlecell {
 
     script:
     """
-    conda run -n scseq python $project_dir/nf_scanvi_integration-9.py \
+    conda run -n scseq python $scripts_dir/nf_scanvi_integration-9.py \
         --datlabel '${params.datlabel}' \
         --indir '${indir}' \
         --outdir 'scanvi_integration' \

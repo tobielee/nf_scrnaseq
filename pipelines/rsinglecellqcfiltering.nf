@@ -1,4 +1,5 @@
 project_dir = "${workflow.projectDir}"
+scripts_dir = "${project_dir}/scripts"
 
 log.info """
     R scRNA-seq  P I P E L I N E
@@ -22,8 +23,8 @@ log.info """
 
 //     script:
 //     """
-//     echo $project_dir
-//     Rscript $project_dir/nf_get_sample_names.R \
+//     echo $scripts_dir
+//     Rscript $scripts_dir/nf_get_sample_names.R \
 //         --datadir '${params.datadir}' \
 //         --parseregex '${params.parseregex}' \
 //         --inputseurat '${params.inputseurat}' \
@@ -45,9 +46,9 @@ process qcFilter {
 
     script:
     """
-    echo $project_dir
-    conda run -n scseq Rscript $project_dir/nf_qcfiltering_check-0.R \
-        '${project_dir}' \
+    echo $scripts_dir
+    conda run -n scseq Rscript $scripts_dir/nf_qcfiltering_check-0.R \
+        '${scripts_dir}' \
         --datlabel '${params.datlabel}' \
         --datadir '${params.datadir}' \
         --outdir '${params.outdir}' \

@@ -1,4 +1,5 @@
 project_dir = "${workflow.projectDir}"
+scripts_dir = "${project_dir}/scripts"
 
 process qcFilter {
     debug true // to output script info to console 
@@ -20,9 +21,9 @@ process qcFilter {
      
     script: // TODO still have dependency of filtered_data annotation and rscript (so need to set both if adjusting)
     """
-    echo $project_dir
-    conda run -n scseq Rscript $project_dir/nf_preprocessing_doubletdetect-1.R \
-        '${project_dir}' \
+    echo $scripts_dir
+    conda run -n scseq Rscript $scripts_dir/nf_preprocessing_doubletdetect-1.R \
+        '${scripts_dir}' \
         --datlabel '${params.datlabel}' \
         --datadir '${params.datadir}' \
         --outdir '${params.outdir}' \
@@ -69,11 +70,11 @@ process normIntegrate {
 
     script:
     """
-    echo $project_dir
+    echo $scripts_dir
     echo $filtered_data
     echo $norm_filtered_data
-    conda run -n scseq Rscript $project_dir/nf_normintegrate-2.R \
-        '${project_dir}' \
+    conda run -n scseq Rscript $scripts_dir/nf_normintegrate-2.R \
+        '${scripts_dir}' \
         --datlabel '${params.datlabel}' \
         --infile '${filtered_data}' \
         --outfile '${norm_filtered_data}' \
@@ -98,10 +99,10 @@ process clustering {
 
     script:
     """
-    echo $project_dir
+    echo $scripts_dir
     echo $norm_filtered_data
-    conda run -n scseq Rscript $project_dir/nf_clustering-3.R \
-        '${project_dir}' \
+    conda run -n scseq Rscript $scripts_dir/nf_clustering-3.R \
+        '${scripts_dir}' \
         --datlabel '${params.datlabel}' \
         --infile '${norm_filtered_data}' \
         --outfile '${clustered_data}' \
