@@ -110,7 +110,7 @@ process annotate_scanvi_celltypist {
     """
     echo $scripts_dir
     echo $norm_filtered_data
-    conda run -n scseq python3 $scripts_dir/nf_cellannotation_scanvi_celltypist_refbased-6.py \
+    conda run -n scseq python3 $scripts_dir/nf_cellannotation_scanvi_celltypist_refbased_gpu-6.py \
         --datlabel '${params.datlabel}' \
         --infile '${annotate1}' \
         --outfile '${queryOutPath}' \

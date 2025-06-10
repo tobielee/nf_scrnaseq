@@ -51,12 +51,13 @@ def run_scanvi_and_celltypist(adata_query, scanvi_model_path, celltypist_model_p
     adata_query.layers["counts"] = adata_query.X.copy()
     # Set values for mapping model prediction
     scvi.model.SCANVI.prepare_query_anndata(adata_query, scanvi_model_path)
-    adata_query.obs["mouse.id"] = adata_query.obs[sample_id] # labels here must be consistent with trained model
-    adata_query.obs["cell_ontology_class"] = "Unknown"
+    adata_query.obs["donor_assay"] = "TSP4_10x 3' v3" # labels here must be consistent with trained model
+    adata_query.obs["cell_ontology_class"] = "unknown"
     
     # Load query data for SCANVI          
     # SCANVI labeling - this must go first since resetting pca hampers modele prediction?
-    vae_q = scvi.model.SCANVI.load_query_data(adata_query, scanvi_model_path)
+    vae_q = scvi.model.SCANVI.load(scanvi_model_path, adata_query)
+    # vae_q = scvi.model.SCANVI.load_query_data(adata_query, scanvi_model_path)
     vae_q.to_device(device)
     vae_q.train(max_epochs=100, plan_kwargs=dict(weight_decay=0.0), check_val_every_n_epoch=10)
     adata_query.obsm["X_scANVI"] = vae_q.get_latent_representation()
