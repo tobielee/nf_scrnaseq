@@ -155,6 +155,7 @@ process plot_annotations {
                 --datlabel '${params.datlabel}' \
                 --infile "\$PKL_FILE" \
                 --sample_id '${params.sample_id}' \
+                --reflab '${params.reflab}' \
                 --integrate '${params.integrate}'
         fi
         """
@@ -169,6 +170,7 @@ process plot_annotations {
                     --datlabel '${params.datlabel}' \
                     --infile "\$INT_FILE" \
                     --sample_id '${params.sample_id}' \
+                    --reflab '${params.reflab}' \
                     --integrate '${params.integrate}'
             fi
         done
