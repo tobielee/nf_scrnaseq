@@ -184,7 +184,7 @@ findDoublets <- function(seurat_obj, PCs = 1:30, pN = 0.25) {
                               pN = pN,
                               pK = selected_pK,
                               nExp = nExp_poi.adj,
-                              reuse.pANN = FALSE,
+                              # reuse.pANN = FALSE,
                               # sct = sct
   )
   return(seurat_obj)
