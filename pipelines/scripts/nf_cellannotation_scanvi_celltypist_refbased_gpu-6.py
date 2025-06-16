@@ -48,7 +48,9 @@ def convert_cols_tostring(adata):
 # TODO I probably need to make it more obvious for passing in input params 
 def run_scanvi_and_celltypist(adata_query, scanvi_model_path, celltypist_model_path, sample_id, ref_label):
     # Set counts so I don't need to backpropagate in R to get counts
-    adata_query.layers["counts"] = adata_query.X.copy()
+    adata_query.layers["counts"] = adata_query.X.copy() # this might not be necessary for label transfer
+    adata_preserved = adata_query.copy()
+
     # Set values for mapping model prediction
     scvi.model.SCANVI.prepare_query_anndata(adata_query, scanvi_model_path)
     adata_query.obs["donor_assay"] = "TSP4_10x 3' v3" # labels here must be consistent with trained model
@@ -60,32 +62,39 @@ def run_scanvi_and_celltypist(adata_query, scanvi_model_path, celltypist_model_p
     # vae_q = scvi.model.SCANVI.load_query_data(adata_query, scanvi_model_path)
     vae_q.to_device(device)
     vae_q.train(max_epochs=100, plan_kwargs=dict(weight_decay=0.0), check_val_every_n_epoch=10)
-    adata_query.obsm["X_scANVI"] = vae_q.get_latent_representation()
-    adata_query.obs[f'scanvipred_{ref_label}'] = vae_q.predict()
-    
+    # Run predictions
+    scanvi_latent = vae_q.get_latent_representation()
+    scanvi_labels = vae_q.predict()
+
+    # Transfer SCANVI predictions to original (preserved) AnnData
+    adata_preserved.obsm["X_scANVI"] = scanvi_latent
+    adata_preserved.obs[f'scanvipred_{ref_label}'] = scanvi_labels
+
     # Celltypist
-    sc.pp.normalize_total(adata_query, target_sum=1e4)
-    sc.pp.log1p(adata_query)
-    # sc.tl.pca(adata_query, n_comps=50)
+    adata_celltypist = adata_preserved.copy()
+    sc.pp.normalize_total(adata_celltypist, target_sum=1e4)
+    sc.pp.log1p(adata_celltypist)
+    sc.tl.pca(adata_celltypist, n_comps=50)
     
-    predictions = celltypist.annotate(adata_query, model=celltypist_model_path, majority_voting=True, use_GPU = True, mode='prob match', p_thres=0.5)
-    adata_query = predictions.to_adata(insert_prob=False, prefix=f'celltypist_{ref_label}.')
+    predictions = celltypist.annotate(adata_celltypist, model=celltypist_model_path, majority_voting=True, use_GPU = torch.cuda.is_available(), mode='prob match', p_thres=0.5)
+    adata_preserved = predictions.to_adata(insert_prob=False, prefix=f'celltypist_{ref_label}.')
     
-    convert_cols_tostring(adata_query)  
-    adata_query.obs.index = adata_query.obs.index.astype(str)
-    print(f"ann obj: {adata_query}")
+    convert_cols_tostring(adata_preserved)  
+    adata_preserved.obs.index = adata_preserved.obs.index.astype(str)
+    print(f"ann obj: {adata_preserved}")
     
     # Save query data with predictions
     if DATA_INTEGRATED:
         query_out = outfile
 
     else:
-        sample_name = adata_query.obs[sample_id][0]
+        sample_name = adata_preserved.obs[sample_id][0]
         directory, filename = os.path.split(outfile)
         query_out = os.path.join(directory, f"{sample_name}_{filename}")
 
     print(f"Saving {outfile} to query data to {query_out}") # for debugging
-    adata_query.write_h5ad(query_out)
+    adata_preserved.write_h5ad(query_out)
+    return adata_preserved
 
 
 if __name__ == '__main__':
@@ -142,11 +151,11 @@ if __name__ == '__main__':
         robjects.r(r_code)
         query_adata = robjects.globalenv['mydata_sce']
     if DATA_INTEGRATED:
-        run_scanvi_and_celltypist(query_adata, scanvi_model_path, celltypist_model_path, sample_id, ref_label)
+        query_adata = run_scanvi_and_celltypist(query_adata, scanvi_model_path, celltypist_model_path, sample_id, ref_label)
     else:
         for i, ann in enumerate(query_adata):
             adata_query = query_adata[ann]
-            run_scanvi_and_celltypist(adata_query, scanvi_model_path, celltypist_model_path, sample_id, ref_label)
+            query_adata[ann] = run_scanvi_and_celltypist(adata_query, scanvi_model_path, celltypist_model_path, sample_id, ref_label)
 
 
     ### save list of anndata objects as dictionary pickle
