@@ -71,15 +71,16 @@ workflow {
         qcFilter(params.datlabel)
     } else {
         // Sample parsing
-       def allFiles = new File(params.datadir).list() // List all files in the specified directory
+        def allFiles = new File(params.datadir).list() // List all files in the specified directory
         def relevantFiles = allFiles.findAll { it =~ /(\.mtx|\.mtx\.gz|\.tsv\.gz|\.tsv)$/ } // Filter relevant files
         println relevantFiles // Output the list of unique sample names
+        def regex = ~params.parseregex
+        def parsedNames = relevantFiles.collect { fname ->
+            def m = fname =~ regex
+            m.find() ? m.group(1) : null
+        }.findAll { it != null }.unique()
 
-        def parsedNames = relevantFiles.collect { it.replaceAll(params.parseregex, '$1') } // Parse file names
-        def sampleList = parsedNames.unique() // Get unique sample names
-        // typechan = Channel.from(sampleList)
-
-        println sampleList // Output the list of unique sample names
-        qcFilter(sampleList)
+        println "Parsed sample names: $parsedNames"
+        qcFilter(parsedNames)
     }
 }
