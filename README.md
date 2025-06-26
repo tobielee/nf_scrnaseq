@@ -69,17 +69,28 @@ git clone <repo>
 
 # install conda environment fresh
 mamba create -n scseq python=3.11
-mamba activate scseq
-mamba install r-seurat
-mamba install r-clustree
-mamba install r-tidyverse
-mamba install genomedk::r-doubletfinder
-mamba install jupyter jupyterlab
-mamba install scanpy scikit-misc python-igraph leidenalg
-mamba install scvi-tools 
-mamba install -c bioconda -c conda-forge celltypist
-mamba install bioconda::anndata2ri bioconda::bioconductor-ucell bioconda::bioconductor-singlecellexperiment
-mamba install r-openxlsx r-hgnchelper
+conda activate scseq
+
+mamba install -y \
+  -c conda-forge \
+  -c bioconda \
+  -c genomedk \
+  -c defaults \
+  jupyter jupyterlab \
+  scanpy scikit-misc python-igraph leidenalg \
+  celltypist anndata2ri bioconductor-ucell bioconductor-singlecellexperiment \
+  r-seurat r-clustree r-tidyverse r-openxlsx r-hgnchelper r-doubletfinder r-argparse
+
+# Install pytorch with CUDA 12.1 (adjust as needed)
+mamba install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+
+# Install JAX with CUDA 12 support
+# For CPU-only version, use: pip install -U jax
+pip install -U "jax[cuda12]"
+
+# Install scvi-tools with CUDA support
+# For CPU-only version, use: pip install -U scvi-tools
+pip install -U "scvi-tools[cuda]"
 ```
 
 **Note**: The `r-doubletfinder` package install via mamba only works on Linux. You can install it manually using the following steps:
@@ -95,9 +106,6 @@ For GPU accelerated training when using scvi-tools, you will need to install [Py
 ##### Another option to install conda environment
 
 ```bash
-# install conda env from yml
-conda env create -n scseq --file scseq_cluster.yml
-
 # gpu accelerated (assumes cuda 12 on linux os)
 conda env create -n scseq --file scseq-cuda.yml
 
