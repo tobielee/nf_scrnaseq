@@ -88,6 +88,7 @@ process annotate_sctype {
         --integrate ${params.integrate} \
         --outfile '${annotate1}' \
         --outfilepre '${annotate_outprefix}' \
+        --sample_id '${params.sample_id}' \
         --subcluster ${params.subcluster} \
         --subclustername ${params.subclustername} \
         --clusterres ${params.clusterres} \

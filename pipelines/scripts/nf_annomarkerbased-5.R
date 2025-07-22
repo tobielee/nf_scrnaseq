@@ -28,6 +28,7 @@ OUTFILE <- get_param_value("--outfile")
 OUTFILE_PRE = get_param_value("--outfilepre")
 NORM <- get_param_value("--norm")
 INTEGRATION <- get_param_value("--integrate")
+SAMPLE_LABEL <- get_param_value("--sample_id")
 
 RES <- as.numeric(get_param_value("--clusterres"))
 SUBCLUSTER = get_param_value("--subcluster")
@@ -54,7 +55,7 @@ getTopDEGs <- function(seurat_object, outfile_prefix = OUTFILE_PRE) {
   if (SUBCLUSTER) {
     sample_name <- SUBCLUSTERNAME
   } else {
-    sample_name <- ifelse(INTEGRATION == "ALL", DATASET_LABEL, seurat_object$sample[[1]]) 
+    sample_name <- ifelse(INTEGRATION == "ALL", DATASET_LABEL, seurat_object[[SAMPLE_LABEL]][[1]]) 
   }
   cat("Processing: ",sample_name, "\n")
   if (toupper(NORM) =="SCT") {
@@ -177,22 +178,22 @@ run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, is_integrate
 
 if (is.list(seurat_data)) {
   seurat_data <- lapply(seurat_data, run_sctype, gs_list = immune_SCTYPE,
-                        sample_indicator = "sample", short_marker_label = "SCType")                 
+                        sample_indicator = SAMPLE_LABEL, short_marker_label = "SCType")                 
   seurat_data <- lapply(seurat_data, run_sctype, gs_list = breast_CELLMARKER2_GENESETS,
-                        sample_indicator = "sample", short_marker_label = "CellMarker2")
+                        sample_indicator = SAMPLE_LABEL, short_marker_label = "CellMarker2")
   seurat_data <- lapply(seurat_data, run_sctype, gs_list = breast_PANGLAO_GENESETS,
-                        sample_indicator = "sample", short_marker_label = "Panglao")
+                        sample_indicator = SAMPLE_LABEL, short_marker_label = "Panglao")
   seurat_data <- lapply(seurat_data, run_sctype, gs_list = fengshuo_TOPP_IMMUNE_GENESETS,
-                        sample_indicator = "sample", short_marker_label = "ToppCell")
+                        sample_indicator = SAMPLE_LABEL, short_marker_label = "ToppCell")
 } else {
   seurat_data <- run_sctype(seurat_data, gs_list = immune_SCTYPE,
-                            sample_indicator = "sample", short_marker_label = "SCType")
+                            sample_indicator = SAMPLE_LABEL, short_marker_label = "SCType")
   seurat_data <- run_sctype(seurat_data, gs_list = breast_CELLMARKER2_GENESETS,
-                        sample_indicator = "sample", short_marker_label = "CellMarker2")
+                        sample_indicator = SAMPLE_LABEL, short_marker_label = "CellMarker2")
   seurat_data <- run_sctype(seurat_data, gs_list = breast_PANGLAO_GENESETS,
-                        sample_indicator = "sample", short_marker_label = "Panglao")
+                        sample_indicator = SAMPLE_LABEL, short_marker_label = "Panglao")
   seurat_data <- run_sctype(seurat_data, gs_list = fengshuo_TOPP_IMMUNE_GENESETS,
-                        sample_indicator = "sample", short_marker_label = "ToppCell")
+                        sample_indicator = SAMPLE_LABEL, short_marker_label = "ToppCell")
 }
 saveRDS(seurat_data, file = OUTFILE)
 

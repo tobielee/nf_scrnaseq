@@ -111,6 +111,7 @@ process clustering {
         --clusterreslist ${params.clusterreslist} \
         --topnfeat ${params.topn_feat} \
         --reduction ${params.reduction} \
+        --sample_id ${params.sample_id} \
         --subcluster ${params.subcluster} \
         --subclustername ${params.subclustername} 
     """
