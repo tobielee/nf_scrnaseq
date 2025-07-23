@@ -131,9 +131,7 @@ for (sample in sample_list) {
   # Calculate percent mitochondrial genes (from raw counts layer)
   seurat_obj[["percent.mt"]] <- PercentageFeatureSet(
     seurat_obj,
-    pattern = mito_10x_pattern,
-    layer = "counts"
-  )
+    pattern = mito_10x_pattern)
   
   # Compute quantile cutoffs for feature count
   lb <- quantile(seurat_obj$nFeature_RNA, probs = FILTER_FEAT_QUANTILE_MIN, na.rm = TRUE)
