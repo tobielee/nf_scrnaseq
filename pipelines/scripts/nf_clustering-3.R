@@ -25,7 +25,7 @@ DATASET_LABEL <- get_param_value("--datlabel")
 INFILE <- get_param_value("--infile")
 OUTFILE <- get_param_value("--outfile")
 INTEGRATION <- get_param_value("--integrate")
-SAMPLE_LABEL <- get_param_value("--sample_id")
+SAMPLE_ID <- get_param_value("--sample_id")
 NPCA_COMPS <- as.numeric(get_param_value("--npca"))
 CLUST_RES <- as.numeric(get_param_value("--clusterreslist")) 
 TOPN_VARFEAT <- as.numeric(get_param_value("--topnfeat"))
@@ -89,7 +89,7 @@ plot_cluster_res <- function(seurat_obj) {
   if (SUBCLUSTER) {
     sample_name <- SUBCLUSTERNAME
   } else {
-    sample_name <- ifelse(INTEGRATION == "ALL", DATASET_LABEL, seurat_obj[[SAMPLE_LAB]][[1]]) 
+    sample_name <- ifelse(INTEGRATION == "ALL", DATASET_LABEL, seurat_obj[[SAMPLE_ID]][[1]]) 
   }
   sample_subdir <- file.path(PLOTSDIR, sample_name)
   if (!dir.exists(sample_subdir)) {
@@ -106,7 +106,7 @@ plot_cluster_res <- function(seurat_obj) {
   dev.off()
   # Umaps to check batch effect 
   # TODO set batch labels
-  batch_labels <- SAMPLE_LABEL # c("sample") #c("model", "model_biorep")
+  batch_labels <- SAMPLE_ID # c("sample") #c("model", "model_biorep")
   if (INTEGRATED) {
     for (batch in batch_labels) {
       p <- DimPlot(seurat_data, reduction = "umap", group.by = batch) +

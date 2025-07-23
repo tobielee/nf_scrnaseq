@@ -4,6 +4,7 @@ library(Seurat)
 library(dplyr)
 library(DoubletFinder)
 library(ggplot2)
+# library(stringr)
 options(bitmapType='cairo')
 
 # Parse command-line arguments + import utility functions
@@ -40,6 +41,7 @@ INDIR <- get_param_value("--datadir")
 SPECIES <- get_param_value("--species")
 TISSUE <- get_param_value("--tissue")
 INPUT_SEURAT <- get_param_value("--inputseurat")
+SAMPLE_ID <- get_param_value("--sample_id")
 
 DOUBLETDETECT = get_param_value("--detectdoub")
 REMOVEDOUBLETS = get_param_value("--removedoub")
@@ -55,10 +57,13 @@ cat(SPECIES, DOUBLETDETECT, REMOVEDOUBLETS, PARSING_REGEX)
 all_files <- list.files(INDIR, full.names = F)
 relevant_files <- grep("\\.(mtx|mtx.gz|tsv.gz|tsv)$", all_files, value = TRUE)
 parsed_names <- gsub(PARSING_REGEX, "\\1", relevant_files) 
+# parsed_names <- str_match(relevant_files, PARSING_REGEX)[,2]
 
 sample_list <- unique(parsed_names)
+
 if (INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0) {
-  sample_list <- c(DATASET_LABEL) # either read to parse or just use DATASET_LABEL
+  seurat_input <- readRDS(INPUT_SEURAT)
+  sample_list <- unique(seurat_input[[SAMPLE_ID]][, 1])
 }
 
 SPECIES = "mouse"
@@ -80,7 +85,9 @@ relevant_files_full <- grep("\\.(mtx|mtx.gz|tsv.gz|tsv)$", all_files_full, value
 for (sample in sample_list){
   print(sample)
   if (INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0) {
-    seurat_obj <- readRDS(INPUT_SEURAT)
+    cells_to_keep <- rownames(seurat_obj@meta.data)[seurat_input@meta.data[[SAMPLE_ID]] == sample]
+    # Subset using the cell names
+    seurat_obj <- subset(seurat_input, cells = cells_to_keep)
     seurat_obj <- subset(seurat_obj, subset = nFeature_RNA > FILTER_FEAT_MIN)
   } else {
     filtered_files <- grep(sample, relevant_files_full, value = TRUE)

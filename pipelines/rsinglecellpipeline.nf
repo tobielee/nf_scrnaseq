@@ -34,6 +34,7 @@ process qcFilter {
         --fmito ${params.fmito} \
         --species '${params.species}' \
         --tissue '${params.tissue}' \
+        --sample_id ${params.sample_id} \
         --detectdoub ${params.detectdoub} \
         --removedoub ${params.removedoub} \
         --inputseurat '${params.inputseurat}' \
