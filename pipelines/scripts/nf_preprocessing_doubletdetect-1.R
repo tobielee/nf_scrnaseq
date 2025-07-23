@@ -60,69 +60,95 @@ parsed_names <- gsub(PARSING_REGEX, "\\1", relevant_files)
 # parsed_names <- str_match(relevant_files, PARSING_REGEX)[,2]
 
 sample_list <- unique(parsed_names)
-
-if (INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0) {
+use_seurat_input <- INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0
+if (use_seurat_input) {
   seurat_input <- readRDS(INPUT_SEURAT)
   sample_list <- unique(seurat_input[[SAMPLE_ID]][, 1])
 }
 
-SPECIES = "mouse"
-if (SPECIES == "mouse") {
-  mito_10x_pattern <- "^mt-"
-} else if (SPECIES == "rat") {
-  mito_10x_pattern <- "^Mt-"
-} else if (SPECIES == "human") {
-  mito_10x_pattern <- "^MT-"
-} else {
-  # Handle the case for other species
-  mito_10x_pattern <- "^MT-"
-}
+mito_10x_pattern <- switch(
+  SPECIES,
+  "mouse" = "^mt-",
+  "rat"   = "^Mt-",
+  "human" = "^MT-",
+  "^MT-"  # default/fallback
+)
 
 seurat_data <- list()
 all_files_full <- list.files(INDIR, full.names = T)
 relevant_files_full <- grep("\\.(mtx|mtx.gz|tsv.gz|tsv)$", all_files_full, value = TRUE)
 # cycle through samples 
-for (sample in sample_list){
-  print(sample)
-  if (INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0) {
-    cells_to_keep <- rownames(seurat_obj@meta.data)[seurat_input@meta.data[[SAMPLE_ID]] == sample]
-    # Subset using the cell names
+for (sample in sample_list) {
+  message("Processing sample: ", sample)
+  
+  if (use_seurat_input) {
+    cells_to_keep <- rownames(seurat_input@meta.data)[seurat_input@meta.data[[SAMPLE_ID]] == sample]
     seurat_obj <- subset(seurat_input, cells = cells_to_keep)
     seurat_obj <- subset(seurat_obj, subset = nFeature_RNA > FILTER_FEAT_MIN)
+    
+    if (ncol(seurat_obj) <= 10) {
+      warning("Skipping sample ", sample, ": too few cells (<= 10)")
+      next
+    }
   } else {
+    # Get file paths for this sample
     filtered_files <- grep(sample, relevant_files_full, value = TRUE)
-    print(filtered_files)
+    message("Matched files: ", toString(filtered_files))
+    
     barcodes <- grep("barcodes", filtered_files, value = TRUE)
     features <- grep("genes|features", filtered_files, value = TRUE)
     mtx_file <- grep("\\.mtx", filtered_files, value = TRUE)
-    # TODO adjust how metadata is parsed
-    split_result <- strsplit(sample, PARSING_SAMPLESPLIT)[[1]] # parsing sample name
+    
+    # Parse metadata from sample name
+    split_result <- strsplit(sample, PARSING_SAMPLESPLIT)[[1]]
     model <- split_result[1]
-    condition <- ifelse(length(split_result) > 1, 
-                        strsplit(sample, "_")[[1]][2], 
-                        "")
-    data <- ReadMtx(mtx = mtx_file, cells = barcodes, features = features, feature.column = 2)
-    seurat_obj <- CreateSeuratObject(counts = data, project = sample, min.cells = FILTER_CELLS_MIN, min.features = FILTER_FEAT_MIN)
+    condition <- ifelse(length(split_result) > 1, split_result[2], "")
+    
+    # Read and create Seurat object
+    data <- ReadMtx(
+      mtx = mtx_file,
+      cells = barcodes,
+      features = features,
+      feature.column = 2
+    )
+    
+    seurat_obj <- CreateSeuratObject(
+      counts = data,
+      project = sample,
+      min.cells = FILTER_CELLS_MIN,
+      min.features = FILTER_FEAT_MIN
+    )
+    
     seurat_obj$sample <- sample
     seurat_obj$model <- model
     seurat_obj$condition <- condition
   }
+
   seurat_obj$dataset <- DATASET_LABEL
   seurat_obj$tissue <- TISSUE
   seurat_obj$species <- SPECIES
-  seurat_obj[["percent.mt"]] <- PercentageFeatureSet(seurat_obj, pattern = mito_10x_pattern)
   
-  lb <- quantile(seurat_obj[["nFeature_RNA"]]$nFeature_RNA, probs = FILTER_FEAT_QUANTILE_MIN)
-  ub <- quantile(seurat_obj[["nFeature_RNA"]]$nFeature_RNA, probs = FILTER_FEAT_QUANTILE_MAX)
-  # filter out "low quality" cells
-  seurat_obj <- subset(seurat_obj,
-                       subset = nFeature_RNA > lb &
-                         nFeature_RNA < ub &
-                         percent.mt < FILTER_MITO_MAX)
+  # Calculate percent mitochondrial genes (from raw counts layer)
+  seurat_obj[["percent.mt"]] <- PercentageFeatureSet(
+    seurat_obj,
+    pattern = mito_10x_pattern,
+    layer = "counts"
+  )
   
+  # Compute quantile cutoffs for feature count
+  lb <- quantile(seurat_obj$nFeature_RNA, probs = FILTER_FEAT_QUANTILE_MIN, na.rm = TRUE)
+  ub <- quantile(seurat_obj$nFeature_RNA, probs = FILTER_FEAT_QUANTILE_MAX, na.rm = TRUE)
+  
+  # Filter low-quality cells
+  seurat_obj <- subset(
+    seurat_obj,
+    subset = nFeature_RNA > lb &
+      nFeature_RNA < ub &
+      percent.mt < FILTER_MITO_MAX
+  )
   
   seurat_data[[sample]] <- seurat_obj
-} 
+}
 saveRDS(seurat_data, file = OUTSFILE1)
 
 # plot cell counts after preprocessing ------------------------------------
