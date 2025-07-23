@@ -34,15 +34,33 @@ scvi.settings.seed = 42
 def convert_cols_tostring(adata):
     for cat in adata.obs.columns:
         if isinstance(adata.obs[cat].values, pd.Categorical):
-            pass
+            continue
         elif pd.api.types.is_float_dtype(adata.obs[cat]):
-            pass
+            continue
         else:
             print(
-                f"Setting obs column {cat} (not categorical neither float) to strings to prevent writing error."
+                f"Setting obs column {cat} (not categorical neither float) to plain strings (object) to prevent writing error."
             )
-            adata.obs[cat] = adata.obs[cat].astype(str)
+            adata.obs[cat] = adata.obs[cat].astype(str).astype(object)
     
+    print("Final obs dtypes:")
+    print(adata.obs.dtypes)
+
+def convert_var_cols_tostring(adata):
+    for col in adata.var.columns:
+        if isinstance(adata.var[col].values, pd.Categorical):
+            continue
+        elif pd.api.types.is_float_dtype(adata.var[col]):
+            continue
+        else:
+            print(
+                f"Setting var column {col} (not categorical neither float) to plain strings (object) to prevent writing error."
+            )
+            adata.var[col] = adata.var[col].astype(str).astype(object)
+
+    print("Final var dtypes:")
+    print(adata.var.dtypes)
+
 
 ### main function for run 
 # TODO I probably need to make it more obvious for passing in input params 
@@ -79,8 +97,10 @@ def run_scanvi_and_celltypist(adata_query, scanvi_model_path, celltypist_model_p
     predictions = celltypist.annotate(adata_celltypist, model=celltypist_model_path, majority_voting=True, use_GPU = torch.cuda.is_available(), mode='prob match', p_thres=0.5)
     adata_preserved = predictions.to_adata(insert_prob=False, prefix=f'celltypist_{ref_label}.')
     
-    convert_cols_tostring(adata_preserved)  
+    convert_cols_tostring(adata_preserved)
+    convert_var_cols_tostring(adata_preserved)
     adata_preserved.obs.index = adata_preserved.obs.index.astype(str)
+    adata_preserved.var.index = adata_preserved.var.index.astype(str)
     print(f"ann obj: {adata_preserved}")
     
     # Save query data with predictions
