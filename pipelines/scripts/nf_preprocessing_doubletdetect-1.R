@@ -86,8 +86,8 @@ for (sample in sample_list) {
     seurat_obj <- subset(seurat_input, cells = cells_to_keep)
     seurat_obj <- subset(seurat_obj, subset = nFeature_RNA > FILTER_FEAT_MIN)
     
-    if (ncol(seurat_obj) <= 10) {
-      warning("Skipping sample ", sample, ": too few cells (<= 10)")
+    if (ncol(seurat_obj) < 50) {
+      warning("Skipping sample ", sample, ": too few cells (<50) and may interfere with PCA")
       next
     }
   } else {
