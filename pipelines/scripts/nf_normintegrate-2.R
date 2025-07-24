@@ -124,10 +124,10 @@ scale_pca_integrate <- function(seurat_input) {
     features <- SelectIntegrationFeatures(object.list = seurat_input)
     seurat_output <- lapply(seurat_input, function(obj) {
       if (toupper(NORM) != "SCT") {
-        obj <- ScaleData(obj, features = features, verbose = FALSE) # avoid scaling if SCT
+        seurat_output <- ScaleData(seurat_output, features = features, verbose = FALSE) # avoid scaling if SCT
       }
-      obj <- RunPCA(obj, features = features, verbose = FALSE)
-      return(obj)
+      seurat_output <- RunPCA(seurat_output, features = features, verbose = FALSE)
+      return(seurat_output)
     })
     cat("Integrating...")
     start <- Sys.time()
@@ -140,7 +140,7 @@ scale_pca_integrate <- function(seurat_input) {
     # TODO This might not be needed - as it is done in next step for clustering 
     features <- VariableFeatures(object = seurat_input)
     if (toupper(NORM) != "SCT") {
-      obj <- ScaleData(obj, features = features, verbose = FALSE) # avoid scaling if SCT
+      seurat_output <- ScaleData(seurat_output, features = features, verbose = FALSE) # avoid scaling if SCT
     }
     seurat_output <- RunPCA(seurat_output, features = features, verbose = FALSE)
   }
