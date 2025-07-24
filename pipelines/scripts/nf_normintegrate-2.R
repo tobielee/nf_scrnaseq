@@ -139,6 +139,7 @@ scale_pca_integrate <- function(seurat_input) {
     # If the input is a single Seurat object
     # TODO This might not be needed - as it is done in next step for clustering 
     features <- VariableFeatures(object = seurat_input)
+    seurat_output <- seurat_input  
     if (toupper(NORM) != "SCT") {
       seurat_output <- ScaleData(seurat_output, features = features, verbose = FALSE) # avoid scaling if SCT
     }
