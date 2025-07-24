@@ -123,7 +123,9 @@ scale_pca_integrate <- function(seurat_input) {
     # If the input is a list of Seurat objects
     features <- SelectIntegrationFeatures(object.list = seurat_input)
     seurat_output <- lapply(seurat_input, function(obj) {
-      obj <- ScaleData(obj, features = features, verbose = FALSE) # TODO may need to avoid this if SCT
+      if (toupper(NORM) != "SCT") {
+        obj <- ScaleData(obj, features = features, verbose = FALSE) # avoid scaling if SCT
+      }
       obj <- RunPCA(obj, features = features, verbose = FALSE)
       return(obj)
     })
@@ -137,7 +139,9 @@ scale_pca_integrate <- function(seurat_input) {
     # If the input is a single Seurat object
     # TODO This might not be needed - as it is done in next step for clustering 
     features <- VariableFeatures(object = seurat_input)
-    seurat_output <- ScaleData(seurat_input, features = features, verbose = FALSE)
+    if (toupper(NORM) != "SCT") {
+      obj <- ScaleData(obj, features = features, verbose = FALSE) # avoid scaling if SCT
+    }
     seurat_output <- RunPCA(seurat_output, features = features, verbose = FALSE)
   }
   return(seurat_output)
@@ -158,7 +162,4 @@ if (toupper(INTEGRATION) == "GROUP") { # TODO need to fix this this still seems 
   }
 }
 
-
 saveRDS(seurat_data, file = OUTFILE)
-# saveRDS(seurat_data, file = paste0("/Users/tlee/Documents/scrnaseq/outs/", DATASET_LABEL,filesuffix))
-
