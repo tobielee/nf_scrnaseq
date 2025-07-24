@@ -29,7 +29,10 @@ OUTFILE_PRE = get_param_value("--outfilepre")
 NORM <- get_param_value("--norm")
 INTEGRATION <- get_param_value("--integrate")
 SAMPLE_LABEL <- get_param_value("--sample_id")
-
+INTEGRATED = T
+if(toupper(INTEGRATION) == "NONE") {
+  INTEGRATED = F
+}
 RES <- as.numeric(get_param_value("--clusterres"))
 SUBCLUSTER = get_param_value("--subcluster")
 SUBCLUSTERNAME = get_param_value("--subclustername")
@@ -124,9 +127,37 @@ cat(db_local3, "\n")
 #                       gs = gs_list$gs_positive, gs2 = gs_list$gs_negative) 
 #'gs_list formatting
 #'
-run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, is_integrated = F,   sample_indicator = "full_id", short_marker_label = short_marker_label) {
-  data_int_lab <- ifelse(is_integrated, "integrated", "RNA")
+run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, norm_method, is_integrated = F, sample_indicator, short_marker_label = short_marker_label) {
   # TODO method of fetching scaled data is not ideal
+  # Determine which assay to pull data from
+  data_assay <- if (norm_method == "SCT") {
+    "SCT"
+  } else if (is_integrated) {
+    "integrated"
+  } else {
+    "RNA"
+  }
+  
+  # Extract appropriate expression matrix
+  sc_data <- if (norm_method == "SCT") {
+    mat <- seurat_object[[data_assay]]$scale.data
+    if (nrow(mat) == 0) stop("SCT data slot is empty. Did you run SCTransform()?")
+    mat
+  } else {
+    mat <- seurat_object[[data_assay]]$scale.data
+    if (nrow(mat) == 0) stop(paste0(data_assay, " scale.data slot is empty. Did you run ScaleData()?"))
+    mat
+  }
+
+  # Run sctype scoring
+  es.max <- sctype_score(
+    scRNAseqData = sc_data,
+    scaled = TRUE,  # Both SCT@data and scale.data are standardized
+    gs = gs_list$gs_positive,
+    gs2 = gs_list$gs_negative
+  )
+  
+  
   es.max = sctype_score(scRNAseqData = seurat_object[[data_int_lab]]$scale.data, scaled = TRUE, 
                         gs = gs_list$gs_positive, gs2 = gs_list$gs_negative) 
   # NOTE: scRNAseqData parameter should correspond to your input scRNA-seq matrix. 
@@ -176,24 +207,32 @@ run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, is_integrate
   return(seurat_object)
 }
 
+gene_sets <- list(
+  SCType      = immune_SCTYPE,
+  CellMarker2 = breast_CELLMARKER2_GENESETS,
+  Panglao     = breast_PANGLAO_GENESETS,
+  ToppCell    = fengshuo_TOPP_IMMUNE_GENESETS
+)
+
 if (is.list(seurat_data)) {
-  seurat_data <- lapply(seurat_data, run_sctype, gs_list = immune_SCTYPE,
-                        sample_indicator = SAMPLE_LABEL, short_marker_label = "SCType")                 
-  seurat_data <- lapply(seurat_data, run_sctype, gs_list = breast_CELLMARKER2_GENESETS,
-                        sample_indicator = SAMPLE_LABEL, short_marker_label = "CellMarker2")
-  seurat_data <- lapply(seurat_data, run_sctype, gs_list = breast_PANGLAO_GENESETS,
-                        sample_indicator = SAMPLE_LABEL, short_marker_label = "Panglao")
-  seurat_data <- lapply(seurat_data, run_sctype, gs_list = fengshuo_TOPP_IMMUNE_GENESETS,
-                        sample_indicator = SAMPLE_LABEL, short_marker_label = "ToppCell")
+  for (label in names(gene_sets)) {
+    seurat_data <- lapply(seurat_data, run_sctype,
+                          norm_method = NORM,
+                          is_integrated = INTEGRATED,
+                          gs_list = gene_sets[[label]],
+                          sample_indicator = SAMPLE_LABEL,
+                          short_marker_label = label)
+  }
 } else {
-  seurat_data <- run_sctype(seurat_data, gs_list = immune_SCTYPE,
-                            sample_indicator = SAMPLE_LABEL, short_marker_label = "SCType")
-  seurat_data <- run_sctype(seurat_data, gs_list = breast_CELLMARKER2_GENESETS,
-                        sample_indicator = SAMPLE_LABEL, short_marker_label = "CellMarker2")
-  seurat_data <- run_sctype(seurat_data, gs_list = breast_PANGLAO_GENESETS,
-                        sample_indicator = SAMPLE_LABEL, short_marker_label = "Panglao")
-  seurat_data <- run_sctype(seurat_data, gs_list = fengshuo_TOPP_IMMUNE_GENESETS,
-                        sample_indicator = SAMPLE_LABEL, short_marker_label = "ToppCell")
+  for (label in names(gene_sets)) {
+    seurat_data <- run_sctype(seurat_data,
+                              norm_method = NORM,
+                              is_integrated = INTEGRATED,
+                              gs_list = gene_sets[[label]],
+                              sample_indicator = SAMPLE_LABEL,
+                              short_marker_label = label)
+  }
 }
+
 saveRDS(seurat_data, file = OUTFILE)
 
