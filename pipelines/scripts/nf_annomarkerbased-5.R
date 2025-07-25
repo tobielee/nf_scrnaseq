@@ -156,10 +156,6 @@ run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, norm_method,
     gs = gs_list$gs_positive,
     gs2 = gs_list$gs_negative
   )
-  
-  
-  es.max = sctype_score(scRNAseqData = seurat_object[[data_int_lab]]$scale.data, scaled = TRUE, 
-                        gs = gs_list$gs_positive, gs2 = gs_list$gs_negative) 
   # NOTE: scRNAseqData parameter should correspond to your input scRNA-seq matrix. 
   # In case Seurat is used, it is either seurat_object[["RNA"]]@scale.data (default), seurat_object[["SCT"]]@scale.data, in case sctransform is used for normalization,
   # or seurat_object[["integrated"]]@scale.data, in case a joint analysis of multiple single-cell datasets is performed.
@@ -192,14 +188,14 @@ run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, norm_method,
   }
   
   print(DimPlot(seurat_object, reduction = "umap", label = TRUE, repel = TRUE, group.by = short_marker_label) + 
-          ggtitle(sprintf("%s %s (res = %s)", sample_name, data_int_lab,  RES)))
+          ggtitle(sprintf("%s %s (res = %s)", sample_name, data_assay,  RES)))
   
   # p1 <- DimPlot(seurat_object, label = T, repel = T, group.by = "seurat_clusters") + ggtitle("Unsupervised clustering")
   p2 <- DimPlot(seurat_object, label = T, repel = T, group.by = short_marker_label) + 
-    ggtitle(sprintf("%s %s (res = %s) SCType \n %s", sample_name, data_int_lab,  RES, short_marker_label))
+    ggtitle(sprintf("%s %s (res = %s) SCType \n %s", sample_name, data_assay,  RES, short_marker_label))
   
   png(filename = file.path(sample_subdir,paste0(OUTFILE_PRE,"_", sample_name,"_",
-                        data_int_lab,"_sc_umap_labeled_sctype",
+                        data_assay,"_sc_umap_labeled_sctype",
                         short_marker_label,".png")), 
       width = 750, height = 500) 
   print(p2)  
