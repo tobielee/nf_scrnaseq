@@ -187,10 +187,18 @@ run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, norm_method,
     dir.create(sample_subdir)
   }
   
-  print(DimPlot(seurat_object, reduction = "umap", label = TRUE, repel = TRUE, group.by = short_marker_label) + 
-          ggtitle(sprintf("%s %s (res = %s)", sample_name, data_assay,  RES)))
+  p1 <- DimPlot(
+    seurat_object, reduction = "umap", label = TRUE, repel = TRUE,
+    group.by = "seurat_cluster"
+  ) + ggtitle(sprintf("%s %s (res = %s)", sample_name, data_assay, RES))
+
+  png(filename = file.path(
+    sample_subdir,
+    paste0(OUTFILE_PRE, "_", sample_name, "_", data_assay, "_sc_umap_clusters.png")
+  ), width = 750, height = 500)
+  print(p1)
+  dev.off()
   
-  # p1 <- DimPlot(seurat_object, label = T, repel = T, group.by = "seurat_clusters") + ggtitle("Unsupervised clustering")
   p2 <- DimPlot(seurat_object, label = T, repel = T, group.by = short_marker_label) + 
     ggtitle(sprintf("%s %s (res = %s) SCType \n %s", sample_name, data_assay,  RES, short_marker_label))
   
