@@ -59,6 +59,7 @@ process qcFilter {
         --fquantmax ${params.fquantmax} \
         --fmito ${params.fmito} \
         --species '${params.species}' \
+        --parseregex '${params.parseregex}' \
         --sample ${sample}
     """
 }

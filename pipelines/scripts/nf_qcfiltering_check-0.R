@@ -31,6 +31,7 @@ FILTER_MITO_MAX <- as.numeric(get_param_value("--fmito"))
 INDIR <- get_param_value("--datadir")
 SPECIES <- get_param_value("--species")
 INPUT_SEURAT <- get_param_value("--inputseurat")
+PARSING_REGEX = get_param_value("--parseregex")
 sample <- get_param_value("--sample")
 cat(sample, "\n")
 # # TODO sample parsing
@@ -58,7 +59,8 @@ if (INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0) {
   relevant_files_full <- grep("\\.(mtx|mtx.gz|tsv.gz|tsv)$", all_files_full, value = TRUE)
   # cycle through samples 
   print(sample)
-  filtered_files <- grep(sample, relevant_files_full, value = TRUE)
+  parsed_names <- gsub(PARSING_REGEX, "\\1", basename(relevant_files_full))
+  filtered_files <- relevant_files_full[parsed_names == sample]
   print(filtered_files)
   barcodes <- grep("barcodes", filtered_files, value = TRUE)
   features <- grep("genes|features", filtered_files, value = TRUE)

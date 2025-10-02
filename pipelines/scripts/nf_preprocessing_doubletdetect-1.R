@@ -53,13 +53,6 @@ PARSING_SAMPLESPLIT = get_param_value("--parsesplit")
 
 cat(SPECIES, DOUBLETDETECT, REMOVEDOUBLETS, PARSING_REGEX)
 
-
-all_files <- list.files(INDIR, full.names = F)
-relevant_files <- grep("\\.(mtx|mtx.gz|tsv.gz|tsv)$", all_files, value = TRUE)
-parsed_names <- gsub(PARSING_REGEX, "\\1", relevant_files) 
-# parsed_names <- str_match(relevant_files, PARSING_REGEX)[,2]
-
-sample_list <- unique(parsed_names)
 use_seurat_input <- INPUT_SEURAT != 'null' && nchar(trimws(INPUT_SEURAT)) > 0
 if (use_seurat_input) {
   seurat_input <- readRDS(INPUT_SEURAT)
@@ -77,6 +70,9 @@ mito_10x_pattern <- switch(
 seurat_data <- list()
 all_files_full <- list.files(INDIR, full.names = T)
 relevant_files_full <- grep("\\.(mtx|mtx.gz|tsv.gz|tsv)$", all_files_full, value = TRUE)
+parsed_names <- gsub(PARSING_REGEX, "\\1", basename(relevant_files_full))
+# parsed_names <- str_match(basename(relevant_files_full), PARSING_REGEX)[,2]
+sample_list <- unique(parsed_names)
 # cycle through samples 
 for (sample in sample_list) {
   message("Processing sample: ", sample)
@@ -92,7 +88,7 @@ for (sample in sample_list) {
     }
   } else {
     # Get file paths for this sample
-    filtered_files <- grep(sample, relevant_files_full, value = TRUE)
+    filtered_files <- relevant_files_full[parsed_names == sample]
     message("Matched files: ", toString(filtered_files))
     
     barcodes <- grep("barcodes", filtered_files, value = TRUE)
