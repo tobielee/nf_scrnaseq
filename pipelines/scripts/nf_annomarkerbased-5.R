@@ -189,7 +189,7 @@ run_sctype <- function(seurat_object, gs_list = CELL_TYPE_GENESETS, norm_method,
   
   p1 <- DimPlot(
     seurat_object, reduction = "umap", label = TRUE, repel = TRUE,
-    group.by = "seurat_cluster"
+    group.by = "seurat_clusters"
   ) + ggtitle(sprintf("%s %s (res = %s)", sample_name, data_assay, RES))
 
   png(filename = file.path(
