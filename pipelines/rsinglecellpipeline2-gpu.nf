@@ -118,6 +118,8 @@ process annotate_scanvi_celltypist {
         --integrate '${params.integrate}' \
         --reflab '${params.reflab}' \
         --scanvi_model_path '${params.scanvi_model_path}' \
+        --scanvi_model_batchkey '${params.scanvi_model_batchkey}' \
+        --scanvi_model_unknownlab '${params.scanvi_model_unknownlab}' \
         --celltypist_model_path '${params.celltypist_model_path}' \
         --sample_id '${params.sample_id}' \
         --subdirectory_name '${params.subdirectory_name}'

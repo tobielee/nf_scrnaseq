@@ -64,15 +64,15 @@ def convert_var_cols_tostring(adata):
 
 ### main function for run 
 # TODO I probably need to make it more obvious for passing in input params 
-def run_scanvi_and_celltypist(adata_query, scanvi_model_path, celltypist_model_path, sample_id, ref_label):
+def run_scanvi_and_celltypist(adata_query, scanvi_model_path, scanvi_model_batchkey, scanvi_model_unknownlab, celltypist_model_path, sample_id, ref_label):
     # Set counts so I don't need to backpropagate in R to get counts
     adata_query.layers["counts"] = adata_query.X.copy() # this might not be necessary for label transfer
     adata_preserved = adata_query.copy()
 
     # Set values for mapping model prediction
     scvi.model.SCANVI.prepare_query_anndata(adata_query, scanvi_model_path)
-    adata_query.obs["donor_assay"] = "TSP4_10x 3' v3" # labels here must be consistent with trained model
-    adata_query.obs["cell_ontology_class"] = "unknown"
+    adata_query.obs["donor_assay"] = scanvi_model_batchkey # labels here must be consistent with trained model
+    adata_query.obs["cell_ontology_class"] = scanvi_model_unknownlab
     
     # Load query data for SCANVI          
     # SCANVI labeling - this must go first since resetting pca hampers modele prediction?
@@ -126,6 +126,8 @@ if __name__ == '__main__':
     parser.add_argument('--integrate', help='integration method')
     parser.add_argument('--reflab', help='reference label for column annotation in anndata.obs', required=True)
     parser.add_argument('--scanvi_model_path', help='path to scanvi model', required=True)
+    parser.add_argument('--scanvi_model_batchkey', help='batch key for scanvi model prediction', required=True)
+    parser.add_argument('--scanvi_model_unknownlab', help='unknown label for scanvi model prediction', required=True)
     parser.add_argument('--celltypist_model_path', help='path to celltypist model', required=True)
     parser.add_argument('--sample_id', help='sample identifier for each subject/patient/rat/mouse')
     parser.add_argument('--subdirectory_name', help='subdirectory for model outs', default='scanvi-celltypist_outs')
@@ -137,6 +139,8 @@ if __name__ == '__main__':
     infile = args.infile
     outfile = args.outfile
     scanvi_model_path = args.scanvi_model_path
+    scanvi_model_batchkey = args.scanvi_model_batchkey
+    scanvi_model_unknownlab = args.scanvi_model_unknownlab
     celltypist_model_path = args.celltypist_model_path
     sample_id = args.sample_id
     ref_label = args.reflab
