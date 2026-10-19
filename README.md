@@ -2,47 +2,72 @@
 
 # Pipeline details
 
-This is a scRNA-seq analysis annotation pipeline. Downstream analyses to be added later. 
+This repository contains staged single-cell RNA-seq analysis workflows. CellRanger runs upstream. The analysis stages expect a flat directory of filtered feature-barcode matrices with sample IDs in their filenames; use the copy workflow to prepare standard CellRanger run directories for that layout. The optional Seurat-object input is selected with `inputseurat` and remains available, but has not been recently validated.
 
-**Current input expected are fastq.**
- 
-1. Alignment for read counts done using CellRanger (STAR).
-```bash
-# single sample
-cellranger count --id=XZ19335 \
-           --transcriptome=/project/zhang/yard/ref/mouse111/Mmusculus_GRCm39_111 \
-           --fastqs=/project/zhang/yard/data/fastq/XZ19335 \
-           --sample=XZ19335_01,XZ19335_02,XZ19335_03,XZ19335_04
+## Workflow layout
 
-# multi sample
-cellranger multi --id=20231124_lung --csv=/project/zhang/yard/nkcell_depletion/20231124_lung/config.csv
+```text
+pipelines/
+├── updated_pipe/   Current Nextflow DSL2 workflows
+├── scripts/        R and Python scripts called by the workflows
+└── legacy/         Historical workflow versions retained for reference
 ```
 
-2. Read counts are copied [nf_cellrangerouts_copy.py]
+The workflow is intentionally split at review points. QC thresholds, clustering resolution, and cell labels are dataset-specific decisions, so each stage writes outputs that can be reviewed before launching the next stage.
 
-3. Read counts are QC'd [nf_qcflitering_check-0.R, nf_preprocessing_doubletdetect-1.R]
+```mermaid
+flowchart TD
+    A[FASTQ reads] --> B[CellRanger run outside this Nextflow analysis]
+    B --> C[CellRanger run output directories]
+    C --> L[Prepare flat filtered matrices<br/>copy_cellranger_outputs.nf]
+    L --> D[QC plots<br/>01_qc_report.nf]
+    M[Already-staged flat matrix directory] --> D
+    D --> E{Review QC and set thresholds}
+    E --> F[Filter, doublet handling,<br/>normalization and clustering<br/>02_preprocess_cluster.nf]
+    F --> G{Review clusters and choose resolution}
+    G --> H[Marker and reference annotations<br/>03_automated_annotation_gpu.nf]
+    H --> I{Review plots and edit annotation CSVs}
+    I --> J[Apply manual labels and backpropagate to Seurat<br/>04_apply_manual_annotations.nf]
+    J -. optional, for multiple datasets .-> K[ScanVI integration<br/>05_scanvi_integration.nf]
+```
 
-4. QC'd Read counts are normalized [nf_normintegrate-2.R] 
+| Stage | Current workflow | Main purpose / handoff |
+|---|---|---|
+| Input staging, when needed | `copy_cellranger_outputs.nf` | Extracts filtered feature-barcode matrices from one or more standard CellRanger run directories, adds run/sample prefixes, and writes them to `outdir`; point the QC stage's `datadir` there. |
+| QC review | `01_qc_report.nf` | Creates per-sample QC plots in `outdir`; use them to choose filtering thresholds. |
+| Preprocess and cluster | `02_preprocess_cluster.nf` | Filters cells, optionally detects/removes doublets, normalizes, and clusters; publishes intermediate RDS files in `outdir`. |
+| Automated annotation | `03_automated_annotation_gpu.nf` | Uses the clustered RDS from the previous stage, evaluates the selected resolution, and produces marker/reference-based annotation results and review files. |
+| Apply reviewed labels | `04_apply_manual_annotations.nf` | Reads edited annotation CSVs and per-sample h5ad files from `outdir`, then writes labeled h5ad and backpropagated Seurat RDS files to `intoutdir`. This stage currently requires `integrate='NONE'`. |
+| Optional integration | `05_scanvi_integration.nf` | Runs ScanVI integration for datasets that need a shared integrated representation; reads from `intoutdir` and writes results under `intoutdir/scanvi_integration/`. |
 
-5. Cells are clustered [nf_clustering-3.R, nf_selectclusterres-4.R]
+The copy workflow is needed for standard CellRanger output layouts unless you have already staged the filtered matrices as flat files with sample IDs in their names. It supports both `cellranger count` and `cellranger multi` outputs. Set `cellrangerroot` to the parent directory containing run-ID subdirectories, then provide the run ID with `datlabel` (or comma-separated IDs with `datlabels`). `cellrangermulti` is `0` for `cellranger count` and `1` for `cellranger multi`.
 
-6. Cells are annotated with marker-based approach e.g. scType [nf_annomarkerbased-5.R] and reference-based approach e.g. scanvi, celltypist [nf_cellannotation_scanvi_celltypist_refbased-6.py]
+For example, stage a single `cellranger count` run and then use the destination as `datadir` for QC:
 
-7. Confirm cluster annotations [nf_plot_cellannotations_eda-7.py], annotate [nf_annotate-8.py], backfill original R objects with annotations [nf_annotations_h5ad_to_rds-8.R]
+```bash
+nextflow -C configs/nextflow.config run pipelines/updated_pipe/copy_cellranger_outputs.nf -profile conda \
+  --cellrangerroot /path/to/cellranger/runs \
+  --datlabel sample_run_id \
+  --cellrangermulti 0 \
+  --outdir /path/to/staged/matrices
+```
 
-[below is optional if using multiple datasets] 
+For multiple runs, use `--datlabels 'run1,run2'`; each run ID must name a subdirectory under `cellrangerroot`. The copy workflow writes the staged matrix files directly into `outdir`.
 
-8. Integrate annotated data [nf_scanvi_integration-9.py]
+Run a current workflow from the repository root with the shared Conda profile, for example:
 
-9. Refine annotations [nf_intannotation_majority.ipynb]
+```bash
+nextflow -C configs/nextflow.config run pipelines/updated_pipe/02_preprocess_cluster.nf -profile conda
+```
 
-Break points which require human intervention led me to break the Nextflow pipeline into sections.
-0. cellranger run and copy done separately
-1. rsinglecellqcfiltering.nf - determining QC parameters for data
-2. rsinglecellpipeline.nf - determining clustering resolution to use
-3. rsinglecellpipeline2.nf - determining appropriate annotations for individual dataset
-4. rsinglecellpipeline3.nf - determining datasets to integrate and potentially reannotate
-5. rsinglecellintegrate.nf - integrating datasets
+Use the corresponding site config under `configs/` when running on a cluster. The default `inputseurat` parameter is empty, which selects the CellRanger input route. The Seurat-object input route remains available for compatibility but has not been recently validated.
+
+For example, load the shared defaults first and then override them with a site config:
+
+```bash
+nextflow -C configs/nextflow.config,configs/nextflow_slurm_mouse2025-gpu.config \
+  run pipelines/updated_pipe/03_automated_annotation_gpu.nf -profile conda
+```
 
 ***
 ## Usage
@@ -158,7 +183,7 @@ There are params which you will need to set.
 `subdirectory_name` = output directory for reference-based annotations \
 `sample_id` =  column name for sample identifier for each subject/patient/rat/mouse \
 `annofield1` = first pass column name for annotations \
-`annofield2` = second pass column name for annotations
+`annofield2` = output column name for the ScanVI training labels derived from `annofield1`; it is not a second manually annotated field
 
  
 

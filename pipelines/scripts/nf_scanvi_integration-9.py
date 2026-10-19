@@ -27,43 +27,77 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 
 scvi.settings.seed = 42
 
-parser = argparse.ArgumentParser(description='scRNA-seq annotate cells - scanvi and celltypist')
+parser = argparse.ArgumentParser(description='Integrate annotated single-cell data with ScanVI')
 parser.add_argument('--datlabel', help='dataset name', required=True)
 parser.add_argument('--indir', help='input directory', required=True)
 parser.add_argument('--outdir', help='output directory', required=True)
+parser.add_argument('--mode', help='file type to load: rds or h5ad', default='h5ad')
+parser.add_argument('--annofield1', help='Name of column var for cell annotations', required=True)
+parser.add_argument('--annofield2', help='Name of the derived column used as ScanVI training labels', required=True)
+
 args = parser.parse_args()
 
 # Assign values to variables
 DATASET_LABEL = args.datlabel
 indir = args.indir
 outdir = args.outdir
+mode = args.mode
+manual_anno_label = args.annofield1
+manual_anno_label2 = args.annofield2
 
 # create outdir for plots
-sampleplots_path = os.path.join(outdir, DATASET_LABEL)
-if not os.path.exists(sampleplots_path):
-    os.makedirs(sampleplots_path)
-sc.settings.figdir = sampleplots_path  # Set the directory to save figures
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+sc.settings.figdir = outdir  # Set the directory to save figures
 
-# load files from the input directory
-rds_files = glob.glob(os.path.join(indir, '*.rds')) # TODO in future try to see if these can just be h5ad files... 
 adata_list = []
-batch_key = "filebatch"
-for file in rds_files:
-    with localconverter(anndata2ri.converter):
-        r_code = f"""
-            suppressPackageStartupMessages(library(Seurat))
-            mydata <- readRDS('{file}')
-            DefaultAssay(mydata) <- "RNA"
-            mydata_sce <- as.SingleCellExperiment(mydata, assay = "RNA")
-        """
-        robjects.r(r_code)
-        query_adata = robjects.globalenv['mydata_sce']
-        query_adata.layers['counts'] = query_adata.X.copy()
-        query_adata.obs[batch_key] = os.path.basename(file)
-        adata_list.append(query_adata)
+batch_key = "filebatch"  # Currently using one batch per file; could allow user-defined batches in the future
 
-# merge datasets
-merged_adata = ad.concat(adata_list, join= "outer") # TODO maybe I should join outer instead especially for disparate data
+if mode == "rds":
+    rds_files = glob.glob(os.path.join(indir, '*.rds'))
+    for file in rds_files:
+        with localconverter(anndata2ri.converter):
+            r_code = f"""
+                suppressPackageStartupMessages(library(Seurat))
+                mydata <- readRDS('{file}')
+                DefaultAssay(mydata) <- "RNA"
+                mydata_sce <- as.SingleCellExperiment(mydata, assay = "RNA")
+            """
+            robjects.r(r_code)
+            query_adata = robjects.globalenv['mydata_sce']
+            query_adata.layers['counts'] = query_adata.X.copy()
+            query_adata.obs[batch_key] = os.path.basename(file)
+            adata_list.append(query_adata)
+    file_keys = rds_files
+
+elif mode == "h5ad":
+    h5ad_files = glob.glob(os.path.join(indir, '*.h5ad'))
+    for file in h5ad_files:
+        adata = ad.read_h5ad(file)
+        # make sure counts layer is available
+        if adata.raw is not None:
+            adata.layers['counts'] = adata.raw.X.copy()
+        else:
+            adata.layers['counts'] = adata.X.copy()
+        adata.obs[batch_key] = os.path.basename(file)
+        adata_list.append(adata)
+    file_keys = h5ad_files
+
+else:
+    raise ValueError(f"Unsupported mode: {mode}")
+
+if not adata_list:
+    raise FileNotFoundError(
+        f"No .{mode} input files found in {indir}; integration needs at least one annotated input."
+    )
+
+# merge datasets (identical for both modes)
+merged_adata = ad.concat(
+    adata_list,
+    join="outer",
+    # label=batch_key,
+    # keys=[os.path.basename(f) for f in file_keys]
+)
 
 def convert_cols_tostring(adata):
     for cat in adata.obs.columns:
@@ -91,6 +125,15 @@ convert_cols_tostring(merged_adata)
 merged_adata.obs.index = merged_adata.obs.index.astype(str) # some annoyance here
 merged_adata.var.index = merged_adata.var.index.astype(str) # some annoyance here
 merged_adata.raw = merged_adata  # keep full dimension safe I hope...
+
+if manual_anno_label not in merged_adata.obs.columns:
+    raise ValueError(
+        f"Annotation column '{manual_anno_label}' not found in merged input data."
+    )
+if not manual_anno_label2:
+    raise ValueError("The ScanVI label column name (--annofield2) cannot be empty.")
+if manual_anno_label2 == manual_anno_label:
+    raise ValueError("--annofield2 must differ from --annofield1 so reviewed labels are preserved.")
 
 sc.pp.highly_variable_genes(merged_adata,flavor="seurat_v3", batch_key=batch_key, n_top_genes=6000, subset=True) # this will autosubset for HVG
 
@@ -120,7 +163,7 @@ else:
 scvi.model.SCVI.setup_anndata(
     merged_adata,
     layer="counts",
-    batch_key="filebatch", # TODO need to have this set for each dataset
+    batch_key=batch_key,
     # categorical_covariate_keys=["cell_source", "donor"],
     # continuous_covariate_keys=["percent_mito", "percent_ribo"],
 )
@@ -131,31 +174,33 @@ if torch_available:
     model.to_device(device)  # Send model to the selected device if PyTorch is available
 model.train()
 
-scvi_model_out = f"{sampleplots_path}/scvi/"
+scvi_model_out = f"{outdir}/scvi/"
 model.save(scvi_model_out, overwrite=False)
 SCVI_LATENT_KEY = "X_scVI"
 merged_adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
 
-# set unknowns in new column
-label_key = "cell_type1_mod" # TODO set
-merged_adata.obs["cell_type1_mod"] = merged_adata.obs["cell_type1"]
-merged_adata.obs["cell_type1_mod"] = merged_adata.obs["cell_type1_mod"].apply(
-    lambda x: "Unknown" if str(x).startswith("Unknown") else x
-)
+# Derive a ScanVI label column without modifying the reviewed source labels.
+label_key = manual_anno_label2
+unknown_prefix = "Unknown"
+label_values = merged_adata.obs[manual_anno_label].fillna(unknown_prefix).astype(str).str.strip()
+unknown_mask = label_values.str.lower().str.startswith("unknown") | label_values.eq("")
+label_values = label_values.mask(unknown_mask, unknown_prefix)
+label_categories = sorted(set(label_values) - {unknown_prefix}) + [unknown_prefix]
+merged_adata.obs[label_key] = pd.Categorical(label_values, categories=label_categories)
 
 scanvi_model = scvi.model.SCANVI.from_scvi_model(
     model,
     adata=merged_adata,
-    labels_key="cell_type1_mod", #TODO need to set this
-    unlabeled_category="Unknown", #TODO may need to adjust the column to translate all unknowns
+    labels_key=label_key,
+    unlabeled_category=unknown_prefix
 )
 scanvi_model.train(max_epochs=20, n_samples_per_label=100)
 SCANVI_LATENT_KEY = "X_scANVI"
 merged_adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(merged_adata)
 
-scanvi_model_out = f"{sampleplots_path}/scanvi/"
+scanvi_model_out = f"{outdir}/scanvi/"
 scanvi_model.save(scanvi_model_out, overwrite=False)
-merged_adata.write_h5ad(f"{DATASET_LABEL}_scanvi_merged.h5ad")
+merged_adata.write_h5ad(f"{outdir}/{DATASET_LABEL}_scanvi_merged.h5ad")
 
 
 # Plotting umaps
@@ -173,10 +218,10 @@ sc.pp.neighbors(merged_adata, use_rep=SCANVI_LATENT_KEY)
 sc.tl.leiden(merged_adata, key_added=LEIDEN_SCANVI)
 sc.tl.umap(merged_adata)
 merged_adata.obsm[SCANVI_UMAP] = merged_adata.obsm["X_umap"].copy()
-merged_adata.write_h5ad(f"{DATASET_LABEL}_scanvi_merged.h5ad")
+merged_adata.write_h5ad(f"{outdir}/{DATASET_LABEL}_scanvi_merged.h5ad")
 
 
-def plot_cell_type_proportions(adata, leiden_key, cell_type_key="cell_type1", title_prefix="Proportion of Cell Types in Leiden Clusters", save_path=None):
+def plot_cell_type_proportions(adata, leiden_key, cell_type_key=label_key, title_prefix="Proportion of Cell Types in Leiden Clusters", save_path=None):
     # Create a DataFrame with Leiden clusters and cell types
     df = adata.obs[[leiden_key, cell_type_key]].copy()
 
@@ -188,10 +233,11 @@ def plot_cell_type_proportions(adata, leiden_key, cell_type_key="cell_type1", ti
     unique_cell_types = df[cell_type_key].unique()
     palette = sns.color_palette('tab20', len(unique_cell_types))
     color_dict = {cell_type: color for cell_type, color in zip(unique_cell_types, palette)}
-    color_dict['Unknown'] = 'black'  # Set 'Unknown' to black
+    if unknown_prefix in unique_cell_types:
+        color_dict[unknown_prefix] = 'black'
 
-    # Reorder the columns in proportions DataFrame to match color_dict order
-    proportions = proportions[color_dict.keys()]
+    # Reorder columns to match the observed cell types and their colors.
+    proportions = proportions[list(color_dict)]
 
     # Create the bar plot
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -207,7 +253,7 @@ def plot_cell_type_proportions(adata, leiden_key, cell_type_key="cell_type1", ti
     # # Display the plot
     # plt.show()
 
-sc.settings.figdir = sampleplots_path  # Set the directory to save figures
+sc.settings.figdir = outdir  # Set the directory to save figures
 # TODO MDE plotting
 # SCVI_MDE_KEY = "X_scVI_MDE"
 # merged_adata.obsm[SCVI_MDE_KEY] = scvi.model.utils.mde(adata.obsm[SCVI_LATENT_KEY])
@@ -219,10 +265,10 @@ sc.settings.figdir = sampleplots_path  # Set the directory to save figures
 
 # Plotting for scVI
 sc.pl.embedding(merged_adata, basis='X_scVI_umap', color=[LEIDEN_SCVI], ncols=1, frameon=False, legend_loc="on data", save=f"_{LEIDEN_SCVI}_{DATASET_LABEL}.png")
-plot_cell_type_proportions(merged_adata, LEIDEN_SCVI, save_path=f"{sampleplots_path}/{LEIDEN_SCVI}_proportions_{DATASET_LABEL}.png")
+plot_cell_type_proportions(merged_adata, LEIDEN_SCVI, save_path=f"{outdir}/{LEIDEN_SCVI}_proportions_{DATASET_LABEL}.png")
 
 # Plotting for scANVI
 sc.pl.embedding(merged_adata, basis='X_scANVI_umap', color=[LEIDEN_SCANVI], ncols=1, frameon=False, legend_loc="on data", save=f"_{LEIDEN_SCANVI}_{DATASET_LABEL}.png")
-plot_cell_type_proportions(merged_adata, LEIDEN_SCANVI, save_path=f"{sampleplots_path}/{LEIDEN_SCANVI}_proportions_{DATASET_LABEL}.png")
+plot_cell_type_proportions(merged_adata, LEIDEN_SCANVI, save_path=f"{outdir}/{LEIDEN_SCANVI}_proportions_{DATASET_LABEL}.png")
 
 

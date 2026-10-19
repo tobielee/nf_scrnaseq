@@ -3,7 +3,6 @@ You will need to define clusterres in nextflow config prior to running this pipe
 This pipeline will help define cell-annotation based on your specified cluster res.
 */  
 project_dir = "${workflow.projectDir}"
-scripts_dir = "${project_dir}/scripts"
 
 // TODO need to maybe borrow method from previous pipeline for integration using seurat object as input
 // problem is that there are multiple .h5ad but single .rds
@@ -22,7 +21,7 @@ process integrate_singlecell {
 
     script:
     """
-    conda run -n scseq python $scripts_dir/nf_scanvi_integration-9.py \
+    conda run -n scseq-cuda python $project_dir/nf_scanvi_integration-9-gpu.py \
         --datlabel '${params.datlabel}' \
         --indir '${indir}' \
         --outdir 'scanvi_integration' \

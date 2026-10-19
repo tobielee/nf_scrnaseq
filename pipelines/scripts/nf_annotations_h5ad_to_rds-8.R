@@ -1,3 +1,9 @@
+library(reticulate)
+conda_prefix <- Sys.getenv("CONDA_PREFIX")
+if (nzchar(conda_prefix)) {
+  use_python(file.path(conda_prefix, "bin", "python"), required = TRUE)
+}
+
 library(anndata)
 library(Seurat)
 
